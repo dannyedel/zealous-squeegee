@@ -57,6 +57,7 @@ if ( not -d "$packages_dir" ) {
 my @falsepositives;
 my @needrebuild;
 my @buildfailed;
+my %packagedetails;
 
 my $done =0;
 
@@ -82,11 +83,7 @@ foreach my $package (@packages) {
 
 	print ("Checking status for $package\n");
 
-	if ( not -f "$logfile" ) {
-		print ("Don't have logfile $logfile, fetching\n");
-		$fetch=1;
-		parse_overviewfile($logfile, $overviewfile, $package);
-	}
+	$fetch= parse_overviewfile($logfile, $overviewfile, $package);
 
 	if ( not -f $logfile ) {
 		die "Logfile not there\n";
@@ -127,23 +124,30 @@ foreach my $package (@packages) {
 
 my $pkg;
 my $fpfile = "output/false-positives.txt";
-my $rpfile = "output/real-problems.txt";
+my $ftbfsfile = "output/fails-to-build-from-source.txt";
+my $rebuildfile = "output/needs-rebuild.txt";
 
+open my $fpHandle, '>', $fpfile;
+open my $ftbfsHandle, '>', $ftbfsfile;
+open my $rebuildHandle, '>', $rebuildfile;
 
 print ("\n\n\n ===== SUMMARY ===== \n\n\n");
 
 foreach $pkg (@falsepositives) {
 	print "False positive: $pkg\n";
+	print $fpHandle formatme($pkg) . "\n";
 }
 
 foreach $pkg (@buildfailed) {
 	print "FTBFS, please check: $pkg\n";
+	print $ftbfsHandle formatme($pkg)."\n";
 }
 
 print ("\n\n\n ===== Built with old gcc ===== \n\n\n");
 
 foreach $pkg (@needrebuild) {
-	print "Please try to rebuild $pkg\n";
+	print "Please check and/or rebuild $pkg\n";
+	print $rebuildHandle formatme($pkg)."\n";
 }
 
 ### subroutines
@@ -176,18 +180,26 @@ sub fetch_overview {
 # parameter 1 outputfile for log
 # parameter 2 filename to parse (overviewfile)
 # parameter 3 package name
-# returns: uri of log file
+# returns: whether the file was fetched
 # sideeffect: writes to logfile
 sub parse_overviewfile {
 	my ( $logfile, $overviewfile, $package ) = @_;
 	open my $infh, '<', $overviewfile;
 
 	# Archs to check for a logfile, in order
-	my @archs = ("amd64", "i386", "arm64" );
+	my @archs = (
+		"amd64", "arm64", "armel", "armhf", "hurd-i386",
+		"i386", "kfreebsd-amd64", "kfreebsd-i386", "mips",
+		"mipsel", "powerpc", "ppc64el", "s390x"
+		);
 
 	while (my $row = <$infh> ) {
 		foreach my $arch (@archs) {
-			if ( (my $url, my $source, my $text) = ( $row =~ /<a href="(fetch.php\?pkg=([^&]+)&amp;arch=$arch&amp;ver=[^&]+&amp;stamp=\d*)">([^<]+)<\/a>/ ) ) {
+			if ( (my $url, my $source, my $version, my $text) = ( $row =~ /<a href="(fetch.php\?pkg=([^&]+)&amp;arch=$arch&amp;ver=([^&]+)&amp;stamp=\d*)">([^<]+)<\/a>/ ) ) {
+
+
+				$packagedetails{$package} = [ $arch, uri_unescape($version), $text ];
+
 				$url = decode_entities($url);
 				print ("Source of $package is $source\n" );
 				$sourcename{$package} = $source;
@@ -196,7 +208,10 @@ sub parse_overviewfile {
 					push @buildfailed, $package;
 					print ("Text $text suggests something went wrong with the build\n");
 				}
-				if ( not -f "$logfile" ) {
+				if ( -f "$logfile" ) {
+					print "Logfile $logfile already there\n";
+					return 0;
+				} else {
 					print ("Fetching log for $package from arch $arch\n");
 					my $browser = LWP::UserAgent->new;
 					my $response = $browser->get("https://buildd.debian.org/status/$url");
@@ -205,10 +220,21 @@ sub parse_overviewfile {
 					open my $outfh, '>', $logfile;
 					print $outfh $response->content;
 					close $outfh;
+					return 1;
 				}
-				return $url;
 			}
 		}
 	}
 	die ("I did not find any log file for $logfile");
+}
+
+# parameter 1: Array to output
+sub formatme {
+	my ( $pkg ) = @_;
+	my $arch = $packagedetails{$pkg}[0];
+	my $version = $packagedetails{$pkg}[1];
+	my $text = $packagedetails{$pkg}[2];
+#	$version = $packagedetails($pk
+#	my ( $arch, $version, $text ) = $packagedetails{$pkg};
+	return "$pkg $arch $version $text";
 }
