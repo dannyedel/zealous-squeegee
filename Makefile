@@ -10,7 +10,7 @@ cache/libstdc++6.ben:
 
 cache/Packages_amd64:
 	mkdir -p cache
-	ben download --config ben.config
+	ben download --config ben.config --areas main --mirror http://ftp.de.debian.org/debian
 
 output/ben_deps: output cache/Packages_amd64 cache/libstdc++6.ben
 	mkdir -p output
