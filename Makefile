@@ -1,7 +1,7 @@
 export BEN_CACHE_DIR=cache
 
 # Add packages to be skipped here.
-SKIP=soapdenovo2
+SKIP=soapdenovo2 swarm-cluster
 
 all: output/needs-rebuild.txt
 
