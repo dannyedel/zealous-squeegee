@@ -6,6 +6,8 @@ use HTML::Entities;
 use experimental 'smartmatch';
 use URI::Escape;
 
+my @skipme = @ARGV;
+
 my $arch = 'amd64';
 
 my $filename = 'output/ben_deps';
@@ -31,7 +33,11 @@ while(my $row = <$fh> ) {
 		if ( $sign eq '[' )
 		{
 			print("Package $package b0rken\n");
-			push @packages, $package;
+			if ( $package ~~ @skipme ) {
+				print("SKIPPING $package\n");
+			} else {
+				push @packages, $package;
+			}
 		} elsif ( $sign eq '(' )
 		{
 			print("Package $package good\n");
