@@ -1,7 +1,9 @@
 export BEN_CACHE_DIR=cache
 
-all: output/ben_deps
+# Add packages to be skipped here.
+SKIP=soapdenovo2
 
+all: output/needs-rebuild.txt
 
 cache/libstdc++6.ben:
 	mkdir -p cache
@@ -15,3 +17,6 @@ cache/Packages_amd64:
 output/ben_deps: output cache/Packages_amd64 cache/libstdc++6.ben
 	mkdir -p output
 	ben monitor --text cache/libstdc++6.ben > $@
+
+output/needs-rebuild.txt: output/ben_deps
+	./parse-buildlog.pl ${SKIP}
